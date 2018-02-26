@@ -12,7 +12,7 @@
     </head>
     <body>
         <script type="text/javascript">
-        var game = new Phaser.Game(1000, 700, Phaser.AUTO, '', { preload: preload, create: create, update: update });
+        var game = new Phaser.Game(1000, 700, Phaser.AUTO, '', { preload: preload, create: create, update: update, render: render });
 
         var runningSpeed = 200;
         
@@ -23,9 +23,9 @@
             game.load.image('florinatorClouds', 'assets/florinatorClouds.png');
             game.load.image('ground', 'assets/ground.png');
             game.load.image('platformJump', 'assets/platform.png')
-            game.load.image('deathWall', 'assets/deathWall.png')
             game.load.image('demon', 'assets/demonRobot.png')
             game.load.image('shot', 'assets/shots.png')
+            game.load.image('bullet', 'assets/bullet.png')
         }
 
         var fartinator;
@@ -39,9 +39,15 @@
         var demons;
         var shots;
         var shot;
+        var fireButton;
+        var bullets;
+        var bullet;
+        var bulletTime = 0;
+        var demonSpawnHeight;
+        var descendingDemon = false;
         var jumpTime = 0;
-        var shootTime = 0;
-        var deathTime = 0;
+        var shootTime = new Array;
+        var livingEnemies = [];
 
         function create(){
             
@@ -85,12 +91,18 @@
             shots.setAll('outOfBoundsKill', true);
             shots.setAll('checkWorldBounds', true);
 
+            bullets = game.add.group();
+            bullets.enableBody = true;
+            bullets.physicsBodyType = Phaser.Physics.ARCADE;
+            bullets.createMultiple(20, 'bullet');
+            bullets.setAll('outOfBoundsKill', true);
+            bullets.setAll('checkWorldBounds', true);
+
             demons = game.add.group();
             demons.enableBody = true;
             demons.physicsBodyType = Phaser.Physics.ARCADE;
-            
 
-            createDemons();
+            createDemons(2);
 
             fartinator = game.add.sprite(150, game.world.height - 100, 'runningStick');
             game.physics.arcade.enable(fartinator);
@@ -100,9 +112,14 @@
             fartinator.animations.add('right', [1, 2, 3, 4, 5], 1, true);
             fartinator.animations.add('up', [0], true);
             fartinator.animations.add('down', [6], true);
+            fartinator.body.setSize(20, 43, 10, 5);
+
+            fireButton = game.input.keyboard.addKey(Phaser.Keyboard.SPACEBAR);
         }
+        
         function update(){
             game.physics.arcade.overlap(fartinator, shots, playerKill, null, this)
+            game.physics.arcade.overlap(bullets, demons, demonKillHandler, null, this)
             game.physics.arcade.collide(fartinator, platforms);
             game.physics.arcade.collide(fartinator, grounds);
             cursors = game.input.keyboard.createCursorKeys();
@@ -111,18 +128,17 @@
             
             fartinator.animations.play('right', 15, true);
             demonFires();
-            moveDemons();
-            // buildDeathWall();
             
- 
             if(fartinator.body.touching.down && fartinator.body.center.y < 645)
             {
                 fartinator.body.velocity.x = runningSpeed;
             }
             if(cursors.up.isDown && fartinator.body.touching.down){
                 fartinator.body.velocity.y = -500;
-                //this piece is broken for making platform disappear
-                //game.destroy(platformJump);
+            }
+            if(cursors.down.isDown)
+            {
+                platform.kill();
             }
             if(fartinator.body.velocity.y < 0){
                 fartinator.animations.play('up', true);
@@ -134,35 +150,84 @@
             if(cursors.right.isDown){
                 buildPlatform();
             }
+            if(fireButton.isDown)
+            {
+                fartinatorFire();
+            }
         }
 
-        function createDemons(){
-            demon = demons.create(game.world.width - 75, 200, 'demon');
-            demon.body.collideWorldBounds = true;
-            demon.anchor.setTo(.5, .5)
+        function render()
+        {
+            game.debug.bodyInfo(fartinator, 32, 32)
+            game.debug.body(fartinator);
+            game.debug.body(shot);
+        }
 
-            // var tween = game.add.tween(demons).to( { y: 400 }, 2000, Phaser.Easing.Linear.None, true, 150, 150, true);
+        function createDemons(demonNumber){
+            for(step = 0; step <= demonNumber; step++)
+            {
+                var demon = demons.create(game.world.width - 75, getRandomGameInt(50, game.world.height - 50), 'demon');
+                demon.body.bounce.set(1);
+                demon.body.collideWorldBounds = true;
+                demon.body.velocity.setTo(0, getRandomGameInt(50, 300))
+                shootTime.push(0);
+            } 
         }
 
         function demonFires(){
-            if(game.time.now > shootTime){
-                shot = shots.getFirstExists(false);
-                if(shot)
-                {
-                    shot.reset(demon.body.x, demon.body.y);
-                    shot.body.immovable = true;
-                    shootTime = game.time.now + getRandomGameInt(500, 1500);
+            for(var i = 0; i < demons.children.length; i++)
+            {
+                var thing = demons.children[i];
+                if(game.time.now > shootTime[i]){
+                    shot = shots.getFirstExists(false);
+                    if(thing != null && thing.alive)
+                    {
+                        shot.reset(thing.body.x, thing.body.y);
+                        shot.body.immovable = true;
+                        shootTime[i] = game.time.now + getRandomGameInt(700, 1500);
+                    }
+                    
+                    shot.body.velocity.x = -runningSpeed;
                 }
-                
-                shot.body.velocity.x = -runningSpeed;
+            };
+        }
+
+        function fartinatorFire(){
+            if(game.time.now > bulletTime)
+            {
+                bullet = bullets.getFirstExists(false);
+                if(bullet)
+                {
+                    bullet.reset(fartinator.x + 20, fartinator.y + 20);
+                    bullet.body.velocity.x = 400
+                    bulletTime = game.time.now + 200;
+                }
             }
         }
 
-        function moveDemons(){
-            if(demon.body.y <= 5){
-                demon.body.velocity.y = 100;
-            }
-            demon.body.velocity.y = -100;
+        // function moveDemons(){
+        //     if(descendingDemon){
+        //         demon.body.velocity.y = -100;
+
+        //         if(demon.body.y <= 5)
+        //         {
+        //             descendingDemon = false;
+        //         }
+        //     }
+        //     else
+        //     {
+        //         demon.body.velocity.y = 100;
+        //         if(demon.body.y >= game.world.height - 50)
+        //         {
+        //             descendingDemon = true;
+        //         }
+        //     }
+            
+        // }
+
+        function demonKillHandler(bullet, demon){
+            bullet.kill();
+            demon.kill();
         }
 
         function buildPlatform(){
@@ -180,21 +245,6 @@
             }
         }
 
-        // function buildDeathWall(){
-        //     if(game.time.now > deathTime)
-        //     {
-        //         var verticle = game.world.height;
-        //         deathWall = deathWalls.getFirstExists(false);
-        //         if(deathWall)
-        //         {
-        //             deathWall.reset(getRandomGameInt(game.world.width, game.world.width + 900), getRandomGameInt(-20, game.world.height))
-        //             deathWall.body.immovable = true;
-        //             deathWall.body.velocity.x = -runningSpeed;
-        //             deathTime = game.time.now + getRandomGameInt(2, 3);
-        //         }
-        //     }
-        // }
-
         function getRandomGameInt(min, max){
             min = Math.ceil(min);
             max = Math.floor(max);
@@ -207,8 +257,7 @@
 
         function playerKill(fartinator){
             fartinator.kill();
-            setTimeout(function(){ fartinator.revive(); }, 3000);
-
+            setTimeout(function(){ fartinator.revive(); }, 1000);
         }
 
         </script>
