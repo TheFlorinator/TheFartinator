@@ -29,6 +29,9 @@
         }
 
         var fartinator;
+        var score = 0;
+        var scoreString = '';
+        var scoreText;
         var sky;
         var clouds;
         var platforms;
@@ -40,8 +43,10 @@
         var shots;
         var shot;
         var fireButton;
+        var stateText;
         var bullets;
         var bullet;
+        var lives;
         var bulletTime = 0;
         var demonSpawnHeight;
         var descendingDemon = false;
@@ -102,8 +107,6 @@
             demons.enableBody = true;
             demons.physicsBodyType = Phaser.Physics.ARCADE;
 
-            createDemons(2);
-
             fartinator = game.add.sprite(150, game.world.height - 100, 'runningStick');
             game.physics.arcade.enable(fartinator);
             fartinator.body.gravity.y = 1000;
@@ -113,6 +116,23 @@
             fartinator.animations.add('up', [0], true);
             fartinator.animations.add('down', [6], true);
             fartinator.body.setSize(20, 43, 10, 5);
+
+            createDemons(2);
+
+            lives = game.add.group();
+            game.add.text(game.world.width - 200, 10, 'Lives: ', { font: '34px Arial', fill: '#fff' });
+
+            createLives(3);
+
+            scoreString = 'Score: '
+            
+
+            
+
+            stateText = game.add.text(game.world.centerX, game.world.centerY, ' ', { font: '84px Arial', fill: '#fff' });
+            stateText.visible = false;
+
+            
 
             fireButton = game.input.keyboard.addKey(Phaser.Keyboard.SPACEBAR);
         }
@@ -163,6 +183,15 @@
             game.debug.body(shot);
         }
 
+        function createLives(liveCount){
+            for(var i = 0; i < liveCount; i++)
+            {
+                var fartinatorLives = lives.create(game.world.width - 100 + (30 * i), 60, 'runningStick')
+                fartinatorLives.anchor.setTo(.5, .5);
+                fartinator.alpha = .4;
+            }
+        }
+
         function createDemons(demonNumber){
             for(step = 0; step <= demonNumber; step++)
             {
@@ -185,8 +214,10 @@
                         shot.reset(thing.body.x, thing.body.y);
                         shot.body.immovable = true;
                         shootTime[i] = game.time.now + getRandomGameInt(700, 1500);
+                        
                     }
-                    
+                    score += 5;
+                    scoreText = game.add.text(10, 10, scoreString + score, { font: '34px Arial', fill: '#fff' });
                     shot.body.velocity.x = -runningSpeed;
                 }
             };
@@ -208,6 +239,12 @@
         function demonKillHandler(bullet, demon){
             bullet.kill();
             demon.kill();
+
+            if(demons.countLiving() === 0)
+            {
+                //score += 1000;
+                shots.callAll('kill', this);
+            }
         }
 
         function buildPlatform(){
@@ -235,9 +272,39 @@
             platform.kill();
         }
 
-        function playerKill(fartinator){
-            fartinator.kill();
-            setTimeout(function(){ fartinator.revive(); }, 1000);
+        function playerKill(fartinator, shot){
+            shot.kill();
+
+            live = lives.getFirstAlive();
+
+            if(live)
+            {
+                live.kill();
+            }
+
+            if(lives.countLiving() < 1)
+            {
+                fartinator.kill();
+                shots.callAll('kill');
+
+                stateText.text="The loss has been found \n click to restart";
+                stateText.visible = true;
+
+                game.input.onTap.addOnce(restart, this);
+            }
+        }
+
+        function restart(){
+            lives.callAll('revive');
+
+            score = 0;
+
+            demons.removeAll();
+            createDemons(2);
+
+            fartinator.revive();
+
+            stateText.visible = false;
         }
 
         </script>
