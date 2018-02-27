@@ -216,6 +216,7 @@
                         shootTime[i] = game.time.now + getRandomGameInt(700, 1500);
                         
                     }
+                    //scoring broken
                     score += 5;
                     scoreText = game.add.text(10, 10, scoreString + score, { font: '34px Arial', fill: '#fff' });
                     shot.body.velocity.x = -runningSpeed;
